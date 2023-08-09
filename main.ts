@@ -67,7 +67,7 @@ export async function signoutRedirectCallback(userManagerSettings: UserManagerSe
  */
 export async function signoutRedirect(
   userManagerSettings: UserManagerSettings,
-  beforeSignout: (user: User) => Promise<boolean>,
+  beforeSignout: (user: User) => Promise<void>,
 ) {
   const userManager = new UserManager(pick(userManagerSettings));
   const user = await userManager.getUser();
