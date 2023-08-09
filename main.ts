@@ -1,18 +1,19 @@
-import { SigninRedirectArgs, SignoutRedirectArgs, UserManager, UserManagerSettings } from "oidc-client-ts";
+import { SigninRedirectArgs, SignoutRedirectArgs, User, UserManager, UserManagerSettings } from "oidc-client-ts";
 
-export type AuthenticateOptions = Pick<
-  UserManagerSettings,
-  | "client_id"
-  | "authority"
-  | "redirect_uri"
-  | "silent_redirect_uri"
-  | "post_logout_redirect_uri"
-  | "scope"
-  | "userStore"
->;
-
-export async function signinRedirectCallback(options: AuthenticateOptions, defaultReturnTo: string) {
-  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+/**
+ * Handles the callback from the identity provider after a user has signed in.
+ * Removes the current page from the session history and navigates to the return URL in the user's state or the default return URL.
+ *
+ * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
+ * @param {string} defaultReturnTo - Default URL to redirect to if no return URL is provided in the user's state.
+ *
+ * @remarks The sid is passed as a query parameter to the return URL.
+ *
+ * @example
+ * await signinRedirectCallback(userManagerConfig, 'https://default-return-url.com');
+ */
+export async function signinRedirectCallback(userManagerSettings: UserManagerSettings, defaultReturnTo: string) {
+  const userManager = new UserManager(pick(userManagerSettings));
   const user = await userManager.signinRedirectCallback();
   const { returnTo } = (user.state as { returnTo?: string }) ?? {};
   const url = new URL(returnTo || defaultReturnTo);
@@ -24,33 +25,78 @@ export async function signinRedirectCallback(options: AuthenticateOptions, defau
   window.location.replace(url.href);
   await new Promise(() => {});
 }
-export function signinSilentCallback(options: AuthenticateOptions) {
-  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+
+/**
+ * Handles the silent callback after a silent sign-in by notifying the parent window of the response from the authorization endpoint.
+ *
+ * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
+ *
+ * @example
+ * await signinSilentCallback(userManagerConfig);
+ */
+export function signinSilentCallback(userManagerSettings: UserManagerSettings) {
+  const userManager = new UserManager(pick(userManagerSettings));
   return userManager.signinSilentCallback();
 }
 
-export async function signoutRedirectCallback(options: AuthenticateOptions) {
-  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+/**
+ * Handles the callback from the identity provider after a user has signed out. It then redirects the user for a new sign-in.
+ *
+ * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
+ *
+ * @example
+ * await signoutRedirectCallback(userManagerConfig);
+ */
+export async function signoutRedirectCallback(userManagerSettings: UserManagerSettings) {
+  const userManager = new UserManager(pick(userManagerSettings));
   const signoutResponse = await userManager.signoutRedirectCallback();
   return userManager.signinRedirect({ redirectMethod: "replace", state: signoutResponse.userState });
 }
 
-export async function signoutRedirect(options: AuthenticateOptions) {
-  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+/**
+ * Redirects the user for sign-out. If the user is not logged in, redirects for sign-in.
+ * Before sign-out, a provided callback is invoked.
+ *
+ * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
+ * @param {function} beforeSignout - A callback invoked before the sign-out.
+ *
+ * @returns {Promise<void>}
+ *
+ * @example
+ * signoutRedirect(userManagerConfig, async (user) => {
+ *   // perform some pre-signout actions or logging
+ * });
+ */
+export async function signoutRedirect(
+  userManagerSettings: UserManagerSettings,
+  beforeSignout: (user: User) => Promise<boolean>,
+) {
+  const userManager = new UserManager(pick(userManagerSettings));
   const user = await userManager.getUser();
 
   const redirectMethod = "replace";
   const url = new URL(window.location.href);
   const returnTo = url.searchParams.get("returnTo");
   const state = returnTo ? { returnTo } : undefined;
-
-  return user
-    ? userManager.signoutRedirect({ redirectMethod, state })
-    : userManager.signinRedirect({ redirectMethod, state });
+  if (user) {
+    await beforeSignout(user);
+    return userManager.signoutRedirect({ redirectMethod, state });
+  } else {
+    return userManager.signinRedirect({ redirectMethod, state });
+  }
 }
 
-export async function authenticate(options: AuthenticateOptions) {
-  const userManager = new UserManager(options);
+/**
+ * Authenticates the user. If the user is not authenticated or the session is expired, it will try to
+ * re-authenticate the user silently. If that fails, it will redirect the user to the identity provider's signin page.
+ *
+ * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
+ *
+ * @example
+ * authenticate(userManagerConfig);
+ */
+export async function authenticate(userManagerSettings: UserManagerSettings) {
+  const userManager = new UserManager(userManagerSettings);
 
   // let's grab the local user from the local store
   let user = await userManager.getUser();
@@ -118,6 +164,14 @@ async function signout(userManager: UserManager) {
   await new Promise(() => {});
 }
 
+/**
+ * Extracts the session ID (`sid`) from the current URL. If found, it removes the `sid_hint` parameter from the URL.
+ *
+ * @returns The session ID if found, otherwise undefined.
+ *
+ * @example
+ * const sessionId = getSessionIdFromUrl();
+ */
 function getSessionIdFromUrl() {
   const url = new URL(window.location.href);
   if (url.searchParams.has("sid_hint")) {
@@ -131,8 +185,42 @@ function getSessionIdFromUrl() {
   }
 }
 
+/**
+ * Gets the return URL to be used after a redirect. If the current path is the root and there's no query or hash,
+ * it returns the full URL.
+ *
+ * @returns The return URL or undefined.
+ *
+ * @example
+ * const returnUrl = getReturnToUrl();
+ */
 function getReturnToUrl() {
   if (window.location.pathname !== "/" || window.location.search !== "" || window.location.hash) {
     return window.location.href;
   }
+}
+
+/**
+ * Picks necessary fields from the UserManagerSettings for creating a new UserManager.
+ *
+ * @param {UserManagerSettings} userManagerSettings - The full configuration settings for the UserManager.
+ * @returns The picked settings.
+ *
+ * @example
+ * const pickedSettings = pick(userManagerConfig);
+ */
+function pick(userManagerSettings: UserManagerSettings) {
+  const { client_id, authority, redirect_uri, silent_redirect_uri, post_logout_redirect_uri, scope, userStore } =
+    userManagerSettings;
+
+  return {
+    client_id,
+    authority,
+    redirect_uri,
+    silent_redirect_uri,
+    post_logout_redirect_uri,
+    scope,
+    userStore,
+    automaticSilentRenew: false,
+  };
 }
