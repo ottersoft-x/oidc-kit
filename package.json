@@ -1,6 +1,6 @@
 {
   "name": "oidc-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "files": [
     "dist"
@@ -42,6 +42,13 @@
   "eslintConfig": {
     "root": true,
     "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+      "ecmaVersion": "latest",
+      "sourceType": "module",
+      "project": [
+        "./tsconfig.json"
+      ]
+    },
     "plugins": [
       "@typescript-eslint"
     ],
@@ -59,7 +66,8 @@
     },
     "rules": {
       "@typescript-eslint/no-explicit-any": "off",
-      "sort-imports": "off"
+      "sort-imports": "off",
+      "@typescript-eslint/no-floating-promises": "warn"
     }
   },
   "prettier": {

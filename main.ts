@@ -11,6 +11,44 @@ export type AuthenticateOptions = Pick<
   | "userStore"
 >;
 
+export async function signinRedirectCallback(options: AuthenticateOptions, defaultReturnTo: string) {
+  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+  const user = await userManager.signinRedirectCallback();
+  const { returnTo } = (user.state as { returnTo?: string }) ?? {};
+  const url = new URL(returnTo || defaultReturnTo);
+  const sid = user.profile.sid;
+  if (sid) {
+    url.searchParams.set("sid_hint", sid);
+  }
+
+  window.location.replace(url.href);
+  await new Promise(() => {});
+}
+export function signinSilentCallback(options: AuthenticateOptions) {
+  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+  return userManager.signinSilentCallback();
+}
+
+export async function signoutRedirectCallback(options: AuthenticateOptions) {
+  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+  const signoutResponse = await userManager.signoutRedirectCallback();
+  return userManager.signinRedirect({ redirectMethod: "replace", state: signoutResponse.userState });
+}
+
+export async function signoutRedirect(options: AuthenticateOptions) {
+  const userManager = new UserManager({ ...options, automaticSilentRenew: false });
+  const user = await userManager.getUser();
+
+  const redirectMethod = "replace";
+  const url = new URL(window.location.href);
+  const returnTo = url.searchParams.get("returnTo");
+  const state = returnTo ? { returnTo } : undefined;
+
+  return user
+    ? userManager.signoutRedirect({ redirectMethod, state })
+    : userManager.signinRedirect({ redirectMethod, state });
+}
+
 export async function authenticate(options: AuthenticateOptions) {
   const userManager = new UserManager(options);
 
@@ -23,11 +61,11 @@ export async function authenticate(options: AuthenticateOptions) {
     try {
       user = await userManager.signinSilent();
     } catch (e) {
-      return signinRedirect(userManager);
+      return signin(userManager);
     }
 
     if (!user) {
-      return signinRedirect(userManager);
+      return signin(userManager);
     }
   }
 
@@ -37,22 +75,22 @@ export async function authenticate(options: AuthenticateOptions) {
       const sessionStatus = await userManager.querySessionStatus();
       sessionId = sessionStatus?.sid;
     } catch (e) {
-      return signoutRedirect(userManager);
+      return signout(userManager);
     }
 
     if (!sessionId) {
-      return signoutRedirect(userManager);
+      return signout(userManager);
     }
   }
 
   // if the session id doesn't match the one in the local user,
   // it means we need to re-authenticate with the identity provider
   if (sessionId !== user.profile.sid) {
-    return signoutRedirect(userManager);
+    return signout(userManager);
   }
 }
 
-async function signinRedirect(userManager: UserManager) {
+async function signin(userManager: UserManager) {
   const payload: SigninRedirectArgs = { redirectMethod: "replace" };
   const returnTo = getReturnToUrl();
   if (returnTo) {
@@ -66,7 +104,7 @@ async function signinRedirect(userManager: UserManager) {
   await new Promise(() => {});
 }
 
-async function signoutRedirect(userManager: UserManager) {
+async function signout(userManager: UserManager) {
   const payload: SignoutRedirectArgs = { redirectMethod: "replace" };
   const returnTo = getReturnToUrl();
   if (returnTo) {
