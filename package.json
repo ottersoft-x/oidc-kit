@@ -1,6 +1,6 @@
 {
   "name": "oidc-kit",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "type": "module",
   "files": [
     "dist"
@@ -34,7 +34,7 @@
     "oidc-client-ts": "^2.2.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=16.0.0"
   },
   "volta": {
     "node": "18.17.0"
