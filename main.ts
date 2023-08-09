@@ -1,22 +1,32 @@
 import { SigninRedirectArgs, SignoutRedirectArgs, User, UserManager, UserManagerSettings } from "oidc-client-ts";
 
+export type SigninRedirectCallbackOptions = {
+  defaultReturnTo: (user: User) => string;
+};
+
 /**
  * Handles the callback from the identity provider after a user has signed in.
  * Removes the current page from the session history and navigates to the return URL in the user's state or the default return URL.
  *
  * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
- * @param {string} defaultReturnTo - Default URL to redirect to if no return URL is provided in the user's state.
+ * @param {SigninRedirectCallbackOptions} options - The options containing a function that determines the default return URL based on the user's data. Only called if the user's state does not contain a return URL.
  *
  * @remarks The sid is passed as a query parameter to the return URL.
  *
+ *
  * @example
- * await signinRedirectCallback(userManagerConfig, 'https://default-return-url.com');
+ * await signinRedirectCallback(userManagerConfig, {
+ *   defaultReturnTo: (user) => 'https://default-return-url.com/' + user.profile.sub
+ * });
  */
-export async function signinRedirectCallback(userManagerSettings: UserManagerSettings, defaultReturnTo: string) {
+export async function signinRedirectCallback(
+  userManagerSettings: UserManagerSettings,
+  options: SigninRedirectCallbackOptions,
+) {
   const userManager = new UserManager(pick(userManagerSettings));
   const user = await userManager.signinRedirectCallback();
   const { returnTo } = (user.state as { returnTo?: string }) ?? {};
-  const url = new URL(returnTo || defaultReturnTo);
+  const url = new URL(returnTo || options.defaultReturnTo(user));
   const sid = user.profile.sid;
   if (sid) {
     url.searchParams.set("sid_hint", sid);
@@ -53,22 +63,28 @@ export async function signoutRedirectCallback(userManagerSettings: UserManagerSe
   return userManager.signinRedirect({ redirectMethod: "replace", state: signoutResponse.userState });
 }
 
+export type SignoutRedirectOptions = {
+  beforeSignout?: (user: User) => Promise<void>;
+};
+
 /**
  * Redirects the user for sign-out. If the user is not logged in, redirects for sign-in.
- * Before sign-out, a provided callback is invoked.
+ * Before sign-out, a provided callback (if available) is invoked.
  *
  * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
- * @param {function} beforeSignout - A callback invoked before the sign-out.
+ * @param {SignoutRedirectOptions} [options={}] - The options containing a callback that is invoked before the sign-out.
+ *
+ * @remarks If the `beforeSignout` callback is provided in the options, it will be executed before the sign-out process.
+ *
  *
  * @example
- * signoutRedirect(userManagerConfig, async (user) => {
- *   // perform some pre-signout actions or logging
+ * await signoutRedirect(userManagerConfig, {
+ *   beforeSignout: async (user) => {
+ *     // perform some pre-signout actions or logging or navigation to a different page to prevent signout
+ *   }
  * });
  */
-export async function signoutRedirect(
-  userManagerSettings: UserManagerSettings,
-  beforeSignout: (user: User) => Promise<void>,
-) {
+export async function signoutRedirect(userManagerSettings: UserManagerSettings, options: SignoutRedirectOptions = {}) {
   const userManager = new UserManager(pick(userManagerSettings));
   const user = await userManager.getUser();
 
@@ -77,7 +93,9 @@ export async function signoutRedirect(
   const returnTo = url.searchParams.get("returnTo");
   const state = returnTo ? { returnTo } : undefined;
   if (user) {
-    await beforeSignout(user);
+    if (options?.beforeSignout) {
+      await options?.beforeSignout(user);
+    }
     return userManager.signoutRedirect({ redirectMethod, state });
   } else {
     return userManager.signinRedirect({ redirectMethod, state });
@@ -91,7 +109,7 @@ export async function signoutRedirect(
  * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
  *
  * @example
- * authenticate(userManagerConfig);
+ * await authenticate(userManagerConfig);
  */
 export async function authenticate(userManagerSettings: UserManagerSettings) {
   const userManager = new UserManager(userManagerSettings);
