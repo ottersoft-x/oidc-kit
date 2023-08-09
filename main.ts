@@ -60,8 +60,6 @@ export async function signoutRedirectCallback(userManagerSettings: UserManagerSe
  * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
  * @param {function} beforeSignout - A callback invoked before the sign-out.
  *
- * @returns {Promise<void>}
- *
  * @example
  * signoutRedirect(userManagerConfig, async (user) => {
  *   // perform some pre-signout actions or logging
