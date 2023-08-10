@@ -23,7 +23,7 @@ export async function signinRedirectCallback(
   userManagerSettings: UserManagerSettings,
   options: SigninRedirectCallbackOptions,
 ) {
-  const userManager = new UserManager(pick(userManagerSettings));
+  const userManager = new UserManager({ ...pick(userManagerSettings), loadUserInfo: true });
   const user = await userManager.signinRedirectCallback();
   const { returnTo } = (user.state as { returnTo?: string }) ?? {};
   const url = new URL(returnTo || options.defaultReturnTo(user));
@@ -45,7 +45,7 @@ export async function signinRedirectCallback(
  * await signinSilentCallback(userManagerConfig);
  */
 export function signinSilentCallback(userManagerSettings: UserManagerSettings) {
-  const userManager = new UserManager(pick(userManagerSettings));
+  const userManager = new UserManager({ ...pick(userManagerSettings), loadUserInfo: true });
   return userManager.signinSilentCallback();
 }
 
