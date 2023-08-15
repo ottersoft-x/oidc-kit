@@ -103,19 +103,6 @@ export async function signoutRedirect(userManagerSettings: UserManagerSettings, 
 }
 
 /**
- * Initiates a silent sign-in request to the identity provider.
- *
- * @param {UserManagerSettings} userManagerSettings - The configuration settings for the UserManager.
- *
- * @example
- * const user = await signinSilent(userManagerConfig);
- */
-export async function signinSilent(userManagerSettings: UserManagerSettings) {
-  const userManager = new UserManager(pick(userManagerSettings));
-  return userManager.signinSilent();
-}
-
-/**
  * Authenticates the user. If the user is not authenticated or the session is expired, it will try to
  * re-authenticate the user silently. If that fails, it will redirect the user to the identity provider's signin page.
  *
