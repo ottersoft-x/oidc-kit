@@ -123,6 +123,7 @@ export async function authenticate(userManagerSettings: UserManagerSettings) {
     try {
       user = await userManager.signinSilent();
     } catch (e) {
+      await userManager.removeUser();
       return signin(userManager);
     }
 
