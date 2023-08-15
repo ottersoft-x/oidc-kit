@@ -112,7 +112,7 @@ export async function signoutRedirect(userManagerSettings: UserManagerSettings, 
  * await authenticate(userManagerConfig);
  */
 export async function authenticate(userManagerSettings: UserManagerSettings) {
-  const userManager = new UserManager(userManagerSettings);
+  const userManager = new UserManager(pick(userManagerSettings));
 
   // let's grab the local user from the local store
   let user = await userManager.getUser();
@@ -132,25 +132,21 @@ export async function authenticate(userManagerSettings: UserManagerSettings) {
     }
   }
 
-  let sessionId = getSessionIdFromUrl();
-  if (!sessionId) {
-    try {
-      const sessionStatus = await userManager.querySessionStatus();
-      sessionId = sessionStatus?.sid;
-    } catch (e) {
-      return signout(userManager);
-    }
-
-    if (!sessionId) {
-      return signout(userManager);
-    }
+  const sessionIdFromUrl = getSessionIdFromUrl();
+  if (sessionIdFromUrl && sessionIdFromUrl === user.profile.sid) {
+    return;
   }
 
-  // if the session id doesn't match the one in the local user,
-  // it means we need to re-authenticate with the identity provider
-  if (sessionId !== user.profile.sid) {
+  try {
+    const sessionStatus = await userManager.querySessionStatus();
+    if (sessionStatus && sessionStatus.sid === user.profile.sid) {
+      return;
+    }
+  } catch (e) {
     return signout(userManager);
   }
+
+  return signout(userManager);
 }
 
 async function signin(userManager: UserManager) {

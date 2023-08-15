@@ -1,6 +1,6 @@
 {
   "name": "oidc-kit",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "A utility wrapper for oidc-client-ts to simplify authentication flow with OpenID Connect.",
   "type": "module",
   "files": [
