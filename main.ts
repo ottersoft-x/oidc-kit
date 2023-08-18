@@ -112,7 +112,7 @@ export async function signoutRedirect(userManagerSettings: UserManagerSettings, 
  * await authenticate(userManagerConfig);
  */
 export async function authenticate(userManagerSettings: UserManagerSettings) {
-  const userManager = new UserManager(pick(userManagerSettings));
+  const userManager = new UserManager({ ...pick(userManagerSettings), loadUserInfo: true });
 
   // let's grab the local user from the local store
   let user = await userManager.getUser();
